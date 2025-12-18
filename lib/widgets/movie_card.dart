@@ -1,84 +1,100 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/models/movie.dart';
 
-// УПРОЩЕНО: Теперь это StatelessWidget
 class MovieCard extends StatelessWidget {
   final Movie movie;
-  final bool isFocused; // Флаг, который передает родитель
 
-  const MovieCard({
-    super.key,
-    required this.movie,
-    this.isFocused = false, // По умолчанию не в фокусе
-  });
+  const MovieCard({super.key, required this.movie});
 
   @override
   Widget build(BuildContext context) {
-    // Радиус скругления и толщина рамки
-    const double borderRadius = 8.0;
-    const double borderWidth = 4.0;
+    // Родительский виджет Focus управляет состоянием фокуса.
+    // Мы используем Focus.of(context), чтобы получить состояние фокуса и изменить внешний вид.
+    final bool hasFocus = Focus.of(context).hasFocus;
 
+    // AnimatedContainer для плавной анимации масштабирования при фокусе
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: isFocused
-            ? Border.all(color: Colors.white, width: borderWidth)
-            : Border.all(color: Colors.transparent, width: borderWidth),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          )
-        ],
-      ),
-      // ClipRRect обеспечивает скругление углов у изображения
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius - (borderWidth / 2)),
-        child: GridTile(
-          footer: GridTileBar(
-            backgroundColor: Colors.black87,
-            title: Text(
-              movie.title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+      curve: Curves.easeOut,
+      transform: hasFocus ? (Matrix4.identity()..scale(1.05)) : Matrix4.identity(),
+      transformAlignment: Alignment.center,
+      child: Card(
+        clipBehavior: Clip.antiAlias, // Обрезаем все, что выходит за границы карточки
+        elevation: hasFocus ? 12 : 4,
+        shadowColor: hasFocus ? Theme.of(context).focusColor.withOpacity(0.8) : Colors.black.withOpacity(0.7),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: hasFocus ? Theme.of(context).focusColor : Colors.transparent,
+            width: 3,
+          ),
+        ),
+        child: Stack(
+          alignment: Alignment.bottomLeft,
+          children: [
+            // Фоновое изображение (постер)
+            Positioned.fill(
+              child: Image.network(
+                movie.posterUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator(strokeWidth: 2.0));
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(child: Icon(Icons.movie, color: Colors.white60, size: 40));
+                },
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-            // ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЕ ГЕТТЕРЫ
-            subtitle: Text(
-              '${movie.year} • ${movie.category}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            
+            // Градиентный оверлей для читаемости текста
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.2),
+                    Colors.black.withOpacity(0.9),
+                  ],
+                  stops: const [0.4, 0.6, 1.0],
+                ),
+              ),
             ),
-          ),
-          child: Image.network(
-            // ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЕ ГЕТТЕРЫ
-            movie.posterUrl, 
-            fit: BoxFit.cover,
-            // Пока изображение загружается, показываем фон
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                color: Colors.grey[850],
-                child: const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2.0),
-                ),
-              );
-            },
-            // В случае ошибки загрузки, показываем иконку
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[850],
-                child: const Center(
-                  child: Icon(Icons.movie, color: Colors.white54, size: 40),
-                ),
-              );
-            },
-          ),
+
+            // Текстовый контент
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      shadows: [Shadow(blurRadius: 3.0, color: Colors.black, offset: Offset(2, 2))],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Показываем год и рейтинг, только если они есть
+                  if (movie.year.isNotEmpty && movie.rating.isNotEmpty)
+                    Text(
+                      '${movie.year} \u2022 ${movie.rating} \u2605', // Добавил звезду для рейтинга
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

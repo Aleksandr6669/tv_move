@@ -5,11 +5,9 @@ class Movie {
   final String title;
   final String description;
   final String posterUrl;
-  final String year;
-  final List<String> genres;
-  final String rating;
+  final int year;
   final String category;
-  final String titleLowercase;
+  final double rating;
 
   Movie({
     required this.id,
@@ -17,68 +15,53 @@ class Movie {
     required this.description,
     required this.posterUrl,
     required this.year,
-    required this.genres,
-    required this.rating,
     required this.category,
-  }) : titleLowercase = title.toLowerCase();
+    required this.rating,
+  });
 
+  // Фабричный конструктор для создания экземпляра из документа Firestore
   factory Movie.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return Movie(
       id: doc.id,
-      title: data['title'] ?? 'Без названия',
+      title: data['title'] ?? '',
       description: data['description'] ?? '',
       posterUrl: data['posterUrl'] ?? '',
-      year: data['year'] ?? 'N/A',
-      genres: List<String>.from(data['genres'] ?? []),
-      rating: data['rating']?.toString() ?? '0.0',
-      category: data['category'] ?? 'Неизвестно',
+      year: data['year'] ?? 0,
+      category: data['category'] ?? '',
+      rating: (data['rating'] ?? 0.0).toDouble(),
     );
   }
 
+  // Фабричный конструктор для создания экземпляра из данных TMDb
   factory Movie.fromTMDb(Map<String, dynamic> data, String category) {
-    final genreList = (data['genres'] as List?)
-        ?.map((genre) => genre['name'] as String)
-        .toList() ?? [];
-    
-    String getPosterUrl(String? path) {
-      if (path != null) {
-        return 'https://image.tmdb.org/t/p/w500$path';
-      }
-      return 'https://via.placeholder.com/500x750.png?text=No+Image';
-    }
-
-    String getYear(String? releaseDate) {
-        if (releaseDate != null && releaseDate.length >= 4) {
-          return releaseDate.substring(0, 4);
-        }
-        return 'N/A';
-    }
-
-    String releaseDate = data['release_date'] ?? data['first_air_date'] ?? '';
-
     return Movie(
       id: (data['id'] ?? 0).toString(),
-      title: data['title'] ?? data['name'] ?? 'Без названия',
+      title: data['title'] ?? data['name'] ?? '',
       description: data['overview'] ?? '',
-      posterUrl: getPosterUrl(data['poster_path']),
-      year: getYear(releaseDate),
-      genres: genreList,
-      rating: (data['vote_average'] ?? 0).toStringAsFixed(1),
+      posterUrl: data['poster_path'] != null
+          ? 'https://image.tmdb.org/t/p/w500${data['poster_path']}'
+          : '', // Можно указать URL-адрес заполнителя
+      year: _parseYear(data['release_date'] ?? data['first_air_date'] ?? ''),
       category: category,
+      rating: (data['vote_average'] ?? 0.0).toDouble(),
     );
   }
 
-  Map<String, dynamic> toFirestore() {
+  // Метод для преобразования экземпляра в JSON для Firestore
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
       'description': description,
       'posterUrl': posterUrl,
       'year': year,
-      'genres': genres,
-      'rating': rating,
       'category': category,
-      'titleLowercase': titleLowercase,
+      'rating': rating,
     };
+  }
+
+  static int _parseYear(String date) {
+    if (date.isEmpty) return 0;
+    return DateTime.parse(date).year;
   }
 }

@@ -1,123 +1,146 @@
 import 'package:flutter/material.dart';
+import 'package:myapp/models/movie.dart';
 import 'package:myapp/services/firestore_service.dart';
+import 'package:uuid/uuid.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   final FirestoreService firestoreService;
-  // УПРОЩЕНО: Убран contentFocusNode
-  final FocusNode menuFocusNode; 
+  final FocusNode menuFocusNode;
   final Function(int) navigateToScreen;
 
   const AdminScreen({
     super.key,
     required this.firestoreService,
-    required this.menuFocusNode, 
+    required this.menuFocusNode,
     required this.navigateToScreen,
   });
 
-  void _showAddMovieDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final posterUrlController = TextEditingController();
-    String category = 'Фильм'; // Значение по умолчанию
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Добавить новый фильм'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Название'),
-                    validator: (value) => value!.isEmpty ? 'Введите название' : null,
-                  ),
-                  TextFormField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(labelText: 'Описание'),
-                    validator: (value) => value!.isEmpty ? 'Введите описание' : null,
-                  ),
-                  TextFormField(
-                    controller: posterUrlController,
-                    decoration: const InputDecoration(labelText: 'URL постера'),
-                    validator: (value) => value!.isEmpty ? 'Введите URL постера' : null,
-                  ),
-                  DropdownButtonFormField<String>(
-                    value: category,
-                    items: ['Новинка', 'Фильм', 'Сериал', 'Мультфильм', 'Аниме']
-                        .map((label) => DropdownMenuItem(value: label, child: Text(label)))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        category = value;
-                      }
-                    },
-                    decoration: const InputDecoration(labelText: 'Категория'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  firestoreService.addMovie(
-                    title: titleController.text,
-                    description: descriptionController.text,
-                    posterUrl: posterUrlController.text,
-                    category: category,
-                  );
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Добавить'),
-            ),
-          ],
-        );
-      },
-    );
+class _AdminScreenState extends State<AdminScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _posterUrlController = TextEditingController();
+  final _yearController = TextEditingController();
+  final _ratingController = TextEditingController();
+  String _selectedCategory = 'Фильм';
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _posterUrlController.dispose();
+    _yearController.dispose();
+    _ratingController.dispose();
+    super.dispose();
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      final newMovie = Movie(
+        id: const Uuid().v4(),
+        title: _titleController.text,
+        description: _descriptionController.text,
+        posterUrl: _posterUrlController.text,
+        year: int.parse(_yearController.text),
+        category: _selectedCategory,
+        rating: double.parse(_ratingController.text),
+      );
+      await widget.firestoreService.addMovie(newMovie); // <-- Исправлено
+
+      // Показываем подтверждение
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Фильм успешно добавлен!')),
+      );
+      // Очищаем форму
+      _formKey.currentState!.reset();
+      _titleController.clear();
+      _descriptionController.clear();
+      _posterUrlController.clear();
+      _yearController.clear();
+      _ratingController.clear();
+      setState(() {
+        _selectedCategory = 'Фильм';
+      });
+       widget.navigateToScreen(7); // Переходим к списку фильмов
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
-      appBar: AppBar(
-        title: const Text('Админ-панель'),
-        backgroundColor: const Color(0xFF2C2C2E),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Form(
+        key: _formKey,
+        child: ListView(
           children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Добавить фильм/сериал'),
-              onPressed: () => _showAddMovieDialog(context),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
-              ),
+            _buildTextFormField(_titleController, 'Название'),
+            _buildTextFormField(_descriptionController, 'Описание', maxLines: 3),
+            _buildTextFormField(_posterUrlController, 'URL постера'),
+            _buildTextFormField(_yearController, 'Год', keyboardType: TextInputType.number),
+            _buildTextFormField(_ratingController, 'Рейтинг', keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+            _buildCategoryDropdown(),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _submitForm,
+              child: const Text('Добавить фильм'),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.list_alt_outlined),
-              label: const Text('Показать весь список'),
-              onPressed: () => navigateToScreen(7), // Индекс для MovieListScreen
-               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
-              ),
+            const SizedBox(height: 16),
+             ElevatedButton(
+              onPressed: () => widget.navigateToScreen(7), // Переход к списку
+              child: const Text('Показать все фильмы'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextFormField(TextEditingController controller, String label, {int maxLines = 1, TextInputType? keyboardType}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Пожалуйста, заполните это поле';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: DropdownButtonFormField<String>(
+        value: _selectedCategory,
+        decoration: const InputDecoration(
+          labelText: 'Категория',
+          border: OutlineInputBorder(),
+        ),
+        items: <String>['Фильм', 'Сериал', 'Мультфильм', 'Аниме', 'Новинка']
+            .map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedCategory = newValue!;
+          });
+        },
       ),
     );
   }

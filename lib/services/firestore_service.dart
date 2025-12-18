@@ -5,91 +5,58 @@ import 'dart:developer' as developer;
 class FirestoreService {
   final FirebaseFirestore _db;
 
-  // Приватный конструктор, чтобы предотвратить прямое создание
+  // Приватный конструктор
   FirestoreService._(this._db);
 
-  // Статический асинхронный метод для безопасной инициализации
+  // Статический асинхронный метод для инициализации
   static Future<FirestoreService?> initialize() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      // УДАЛЕНО: Проверка health_check. Она больше не нужна.
-      // await firestore.collection('health_check').limit(1).get();
-      developer.log('Firestore instance created successfully.', name: 'FirestoreService');
+      await firestore.collection('test_connection').limit(1).get();
+      developer.log('Успешное подключение к Firestore.', name: 'FirestoreService');
       return FirestoreService._(firestore);
-    } catch (e, stacktrace) {
+    } catch (e) {
       developer.log(
-        'FATAL: Failed to initialize FirestoreService: $e',
-        stackTrace: stacktrace,
+        'Ошибка подключения к Firestore. Убедитесь, что вы настроили Firebase для своего проекта и что правила безопасности разрешают чтение/запись.',
         name: 'FirestoreService',
+        error: e,
         level: 1000, // SEVERE
       );
-      // Возвращаем null, чтобы сигнализировать об ошибке инициализации
       return null;
     }
   }
 
-  // ДОБАВЛЕН НОВЫЙ МЕТОД
-  Future<void> addMovie({
-    required String title,
-    required String description,
-    required String posterUrl,
-    required String category,
-  }) async {
-    developer.log('Добавление нового фильма: "$title"', name: 'FirestoreService');
+  // Приватный метод для пакетного добавления
+  Future<void> _addMoviesBatch(List<Movie> movies) async {
+    final batch = _db.batch();
+    final moviesCollection = _db.collection('movies');
+
+    for (var movie in movies) {
+      var docRef = moviesCollection.doc();
+      batch.set(docRef, movie.toJson());
+    }
+    await batch.commit();
+    developer.log('${movies.length} фильмов было добавлено в Firestore.', name: 'FirestoreService');
+  }
+
+  // Публичный метод для добавления одного фильма
+  Future<void> addMovie(Movie movie) async {
     try {
-      final movieCollection = _db.collection('movies');
-      await movieCollection.add({
-        'title': title,
-        'description': description,
-        'posterUrl': posterUrl,
-        'category': category,
-        'titleLowercase': title.toLowerCase(),
-      });
-      developer.log('Фильм "$title" успешно добавлен.', name: 'FirestoreService');
-    } catch (e, stacktrace) {
-      developer.log(
-        'Ошибка при добавлении фильма "$title": $e',
-        stackTrace: stacktrace,
-        name: 'FirestoreService',
-        level: 1000,
-      );
-      throw Exception('Не удалось добавить фильм: $e');
+      await _db.collection('movies').add(movie.toJson());
+      developer.log('Фильм "${movie.title}" добавлен.', name: 'FirestoreService');
+    } catch (e) {
+      developer.log('Ошибка при добавлении фильма: $e', name: 'FirestoreService', level: 1000);
     }
   }
 
-  Future<void> addMovies(List<Movie> movies) async {
-    developer.log('Начало добавления ${movies.length} фильмов в Firestore...', name: 'FirestoreService');
-    WriteBatch batch = _db.batch();
-    int count = 0;
-
-    for (final movie in movies) {
-      final docRef = _db.collection('movies').doc(movie.id);
-      batch.set(docRef, movie.toFirestore());
-      count++;
-
-      if (count == 499) {
-        try {
-          await batch.commit();
-          batch = _db.batch();
-          count = 0;
-          developer.log('Коммит пакета из 499 записей...', name: 'FirestoreService');
-        } catch (e, stacktrace) {
-          developer.log('Ошибка Firebase при коммите пакета: $e', stackTrace: stacktrace, name: 'FirestoreService');
-          throw Exception('Не удалось выполнить коммит пакета: $e');
-        }
-      }
+  Future<bool> hasMovies() async {
+    try {
+      final snapshot = await _db.collection('movies').limit(1).get();
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      developer.log('Ошибка при проверке наличия фильмов: $e', name: 'FirestoreService', level: 1000);
+      return false;
     }
-
-    if (count > 0) {
-       try {
-        await batch.commit();
-        developer.log('Коммит последнего пакета из $count записей.', name: 'FirestoreService');
-       } catch (e, stacktrace) {
-          developer.log('Ошибка Firebase при коммите последнего пакета: $e', stackTrace: stacktrace, name: 'FirestoreService');
-          throw Exception('Не удалось выполнить коммит последнего пакета: $e');
-       }
-    }
-    developer.log('Успешно добавлено ${movies.length} фильмов.', name: 'FirestoreService');
   }
 
   Future<List<Movie>> getMoviesByCategory(String category) async {
@@ -98,62 +65,63 @@ class FirestoreService {
           .collection('movies')
           .where('category', isEqualTo: category)
           .get();
-      
-      final movies = snapshot.docs.map((doc) => Movie.fromFirestore(doc)).toList();
-      developer.log('Загружено ${movies.length} фильмов для категории "$category"', name: 'FirestoreService');
-      return movies;
+      return snapshot.docs.map((doc) => Movie.fromFirestore(doc)).toList();
+    } catch (e) {
+        developer.log('Ошибка при получении фильмов по категории \'$category\': $e', name: 'FirestoreService', level: 1000);
+        return [];
+    }
+  }
 
-    } catch (e, stacktrace) {
-      developer.log('Ошибка при загрузке фильмов по категории "$category": $e', stackTrace: stacktrace, name: 'FirestoreService');
-      throw Exception('Не удалось загрузить фильмы для категории "$category"');
+  Future<List<Movie>> getAllMovies() async {
+    try {
+      final snapshot = await _db.collection('movies').get();
+      return snapshot.docs.map((doc) => Movie.fromFirestore(doc)).toList();
+    } catch (e) {
+      developer.log('Ошибка при получении всех фильмов: $e', name: 'FirestoreService', level: 1000);
+      return [];
+    }
+  }
+
+  Future<void> deleteMovie(String id) async {
+    try {
+      await _db.collection('movies').doc(id).delete();
+      developer.log('Фильм с ID $id удален.', name: 'FirestoreService');
+    } catch (e) {
+      developer.log('Ошибка при удалении фильма с ID $id: $e', name: 'FirestoreService', level: 1000);
     }
   }
 
   Future<List<Movie>> searchMovies(String query) async {
     if (query.isEmpty) return [];
-    
+
     try {
-      final searchQuery = query.toLowerCase();
       final snapshot = await _db
           .collection('movies')
-          .where('titleLowercase', isGreaterThanOrEqualTo: searchQuery)
-          .where('titleLowercase', isLessThanOrEqualTo: '$searchQuery\uf8ff')
+          .where('title', isGreaterThanOrEqualTo: query)
+          .where('title', isLessThanOrEqualTo: '$query\uf8ff')
           .get();
-
-      final movies = snapshot.docs.map((doc) => Movie.fromFirestore(doc)).toList();
-      developer.log('Найдено ${movies.length} фильмов по запросу "$query"', name: 'FirestoreService');
-      return movies;
-
-    } catch (e, stacktrace) {
-      developer.log('Ошибка при поиске фильмов по запросу "$query": $e', stackTrace: stacktrace, name: 'FirestoreService');
-      throw Exception('Не удалось выполнить поиск по запросу "$query"');
+      return snapshot.docs.map((doc) => Movie.fromFirestore(doc)).toList();
+    } catch (e) {
+      developer.log('Ошибка при поиске фильмов: $e', name: 'FirestoreService', level: 1000);
+      return [];
     }
   }
 
-  Future<void> clearAllMovies() async {
-    developer.log('Начало полной очистки коллекции movies...', name: 'FirestoreService');
+  Future<void> deleteAllMovies() async {
     try {
-      int deletedCount;
-      do {
-        final snapshot = await _db.collection('movies').limit(500).get();
-        deletedCount = snapshot.docs.length;
-
-        if (deletedCount == 0) break;
-
-        final batch = _db.batch();
-        for (var doc in snapshot.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
-        developer.log('Удалено $deletedCount документов.', name: 'FirestoreService');
-
-      } while (deletedCount > 0);
-      
-      developer.log('Очистка коллекции завершена.', name: 'FirestoreService');
-
-    } catch(e, stacktrace) {
-       developer.log('Ошибка при очистке коллекции: $e', stackTrace: stacktrace, name: 'FirestoreService');
-       throw Exception('Не удалось очистить коллекцию: $e');
+      final snapshot = await _db.collection('movies').get();
+      final batch = _db.batch();
+      for (var doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      developer.log('Все фильмы были удалены из Firestore.', name: 'FirestoreService');
+    } catch (e) {
+      developer.log('Ошибка при удалении всех фильмов: $e', name: 'FirestoreService', level: 1000);
     }
+  }
+   // Добавляем метод для вызова пакетного добавления
+   Future<void> addMovies(List<Movie> movies) async {
+    await _addMoviesBatch(movies);
   }
 }

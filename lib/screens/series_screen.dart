@@ -46,30 +46,32 @@ class _SeriesScreenState extends State<SeriesScreen> {
           return const Center(child: Text('Нет данных'));
         }
 
-        return GridView.builder(
-          focusNode: widget.contentFocusNode, // ИСПОЛЬЗУЕМ contentFocusNode
-          padding: const EdgeInsets.all(24.0),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _crossAxisCount,
-            childAspectRatio: 0.65,
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-          ),
-          itemCount: movies.length,
-          itemBuilder: (context, index) {
-            return Focus(
-              onKey: (node, event) {
-                if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                  if (index % _crossAxisCount == 0) {
-                    widget.menuFocusNode.requestFocus();
-                    return KeyEventResult.handled;
+        return Focus(
+          focusNode: widget.contentFocusNode,
+          child: GridView.builder(
+            padding: const EdgeInsets.all(24.0),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _crossAxisCount,
+              childAspectRatio: 0.65,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 20,
+            ),
+            itemCount: movies.length,
+            itemBuilder: (context, index) {
+              return Focus(
+                onKey: (node, event) {
+                  if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    if (index % _crossAxisCount == 0) {
+                      widget.menuFocusNode.requestFocus();
+                      return KeyEventResult.handled;
+                    }
                   }
-                }
-                return KeyEventResult.ignored;
-              },
-              child: MovieCard(movie: movies[index]),
-            );
-          },
+                  return KeyEventResult.ignored;
+                },
+                child: MovieCard(movie: movies[index]),
+              );
+            },
+          ),
         );
       },
     );

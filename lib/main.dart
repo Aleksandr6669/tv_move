@@ -56,7 +56,6 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   int _selectedIndex = 0;
   final FocusNode _menuFocusNode = FocusNode();
-  // ВОССТАНОВЛЕНИЕ: Возвращаем contentFocusNode
   final FocusNode _contentFocusNode = FocusNode(); 
 
   final List<String> _menuItems = [
@@ -66,7 +65,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _menuFocusNode.dispose();
-    _contentFocusNode.dispose(); // Не забываем его очищать
+    _contentFocusNode.dispose();
     super.dispose();
   }
 
@@ -74,8 +73,6 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _selectedIndex = index;
     });
-    // ВОССТАНОВЛЕНИЕ: Явно передаем фокус контенту при навигации
-    // Небольшая задержка, чтобы виджет успел построиться
     Future.delayed(const Duration(milliseconds: 50), () {
       _contentFocusNode.requestFocus();
     });
@@ -108,28 +105,32 @@ class _MyAppState extends State<MyApp> {
           bodyLarge: TextStyle(color: Colors.white),
           bodyMedium: TextStyle(color: Colors.white70),
         ),
-        focusColor: const Color(0xFFE50914), // Яркий акцентный цвет
+        focusColor: const Color(0xFFE50914),
       ),
       home: Scaffold(
         body: Row(
           children: [
             NavigationRail(
-              focusNode: _menuFocusNode,
               selectedIndex: _selectedIndex,
               onDestinationSelected: _navigateToScreen,
               labelType: NavigationRailLabelType.all,
               backgroundColor: const Color(0xFF121212),
               indicatorColor: Colors.transparent,
               minWidth: 100,
-              destinations: _menuItems.map((item) => 
-                NavigationRailDestination(
-                  icon: const SizedBox.shrink(), // Иконки не нужны
-                  label: _NavigationLabel(text: item),
-                )
-              ).toList(),
+              destinations: _menuItems.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return NavigationRailDestination(
+                      icon: const SizedBox.shrink(), 
+                      label: _NavigationLabel(text: item, isSelected: _selectedIndex == index),
+                  );
+              }).toList(),
             ),
             Expanded(
-              child: _getScreen(_selectedIndex),
+              child: Focus(
+                focusNode: _contentFocusNode,
+                child: _getScreen(_selectedIndex)
+              ),
             ),
           ],
         ),
@@ -140,20 +141,16 @@ class _MyAppState extends State<MyApp> {
 
 class _NavigationLabel extends StatelessWidget {
   final String text;
-  const _NavigationLabel({required this.text});
+  final bool isSelected;
+
+  const _NavigationLabel({required this.text, required this.isSelected});
 
   @override
   Widget build(BuildContext context) {
-    // Получаем текущее состояние фокуса для этого виджета
     final bool hasFocus = Focus.of(context).hasFocus;
-    // Получаем текущую выбранную вкладку из NavigationRail
-    final rail = NavigationRail.of(context);
-    final int currentIndex = rail.selectedIndex ?? 0;
-    final int thisIndex = rail.destinations.indexWhere((d) => (d.label as _NavigationLabel).text == text);
-    final bool isSelected = currentIndex == thisIndex;
 
     return Container(
-      width: double.infinity, // Заполняем всю доступную ширину
+      width: double.infinity, 
       padding: const EdgeInsets.symmetric(vertical: 15.0),
       decoration: BoxDecoration(
         color: isSelected ? const Color(0xFF2C2C2E) : Colors.transparent,
