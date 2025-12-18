@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "10835742022",
+    "project_id": "tvscreen-76019626-a9238",
+    "storage_bucket": "tvscreen-76019626-a9238.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10835742022:android:5fd4969029ba72a7f02947",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcGaAF3B-JPJtn9JkD0KhTF7PPtQFlIPw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
