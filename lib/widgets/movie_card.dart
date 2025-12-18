@@ -1,100 +1,109 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/models/movie.dart';
+import 'package:myapp/screens/movie_details_screen.dart';
+import 'package:myapp/services/tmdb_service.dart';
 
-class MovieCard extends StatelessWidget {
+class MovieCard extends StatefulWidget {
   final Movie movie;
+  final TMDbService tmdbService;
 
-  const MovieCard({super.key, required this.movie});
+  const MovieCard({super.key, required this.movie, required this.tmdbService});
+
+  @override
+  State<MovieCard> createState() => _MovieCardState();
+}
+
+class _MovieCardState extends State<MovieCard> {
+  bool _isFocused = false;
+
+  void _navigateToDetails() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (context) => MovieDetailsScreen(
+        movieId: widget.movie.tmdbId,
+        category: widget.movie.category,
+        tmdbService: widget.tmdbService,
+      ),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Родительский виджет Focus управляет состоянием фокуса.
-    // Мы используем Focus.of(context), чтобы получить состояние фокуса и изменить внешний вид.
-    final bool hasFocus = Focus.of(context).hasFocus;
-
-    // AnimatedContainer для плавной анимации масштабирования при фокусе
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      transform: hasFocus ? (Matrix4.identity()..scale(1.05)) : Matrix4.identity(),
-      transformAlignment: Alignment.center,
-      child: Card(
-        clipBehavior: Clip.antiAlias, // Обрезаем все, что выходит за границы карточки
-        elevation: hasFocus ? 12 : 4,
-        shadowColor: hasFocus ? Theme.of(context).focusColor.withOpacity(0.8) : Colors.black.withOpacity(0.7),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-            color: hasFocus ? Theme.of(context).focusColor : Colors.transparent,
-            width: 3,
+    return GestureDetector(
+      onTap: _navigateToDetails,
+      child: FocusableActionDetector(
+        onFocusChange: (isFocused) {
+          if (mounted) {
+            setState(() {
+              _isFocused = isFocused;
+            });
+          }
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (intent) => _navigateToDetails(),
           ),
-        ),
-        child: Stack(
-          alignment: Alignment.bottomLeft,
-          children: [
-            // Фоновое изображение (постер)
-            Positioned.fill(
-              child: Image.network(
-                movie.posterUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Center(child: CircularProgressIndicator(strokeWidth: 2.0));
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(child: Icon(Icons.movie, color: Colors.white60, size: 40));
-                },
-              ),
-            ),
-            
-            // Градиентный оверлей для читаемости текста
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.9),
-                  ],
-                  stops: const [0.4, 0.6, 1.0],
-                ),
-              ),
-            ),
-
-            // Текстовый контент
-            Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      shadows: [Shadow(blurRadius: 3.0, color: Colors.black, offset: Offset(2, 2))],
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  // Показываем год и рейтинг, только если они есть
-                  if (movie.year.isNotEmpty && movie.rating.isNotEmpty)
-                    Text(
-                      '${movie.year} \u2022 ${movie.rating} \u2605', // Добавил звезду для рейтинга
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 12,
+        },
+        child: SizedBox(
+          width: 150, // Fixed width for each card
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Movie Poster
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(widget.movie.posterUrl),
+                          fit: BoxFit.cover,
+                        ),
+                        border: _isFocused
+                            ? Border.all(color: Colors.green, width: 3)
+                            : null,
                       ),
                     ),
-                ],
+                    // Rating badge
+                    if (widget.movie.rating > 0)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            widget.movie.rating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              // Movie Title
+              Text(
+                widget.movie.title,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              // Year
+              Text(
+                widget.movie.year.toString(),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ),
     );

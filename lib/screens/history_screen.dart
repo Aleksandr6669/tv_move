@@ -5,11 +5,8 @@ class HistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Text('История просмотров', style: TextStyle(color: Colors.white)),
-      ),
+    return const Center(
+      child: Text('History Screen', style: TextStyle(color: Colors.white)),
     );
   }
 }

@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:myapp/models/movie.dart';
-import 'package:myapp/services/firestore_service.dart';
+import 'package:myapp/services/tmdb_service.dart';
 import 'package:myapp/widgets/movie_card.dart';
 
 class CartoonsScreen extends StatefulWidget {
-  final FirestoreService firestoreService;
+  final TMDbService tmdbService;
   final FocusNode menuFocusNode;
-  final FocusNode contentFocusNode;
 
   const CartoonsScreen({
     super.key,
-    required this.firestoreService,
+    required this.tmdbService,
     required this.menuFocusNode,
-    required this.contentFocusNode,
   });
 
   @override
@@ -22,12 +20,11 @@ class CartoonsScreen extends StatefulWidget {
 
 class _CartoonsScreenState extends State<CartoonsScreen> {
   late Future<List<Movie>> _loadMoviesFuture;
-  static const int _crossAxisCount = 5;
 
   @override
   void initState() {
     super.initState();
-    _loadMoviesFuture = widget.firestoreService.getMoviesByCategory('Мультфильм');
+    _loadMoviesFuture = widget.tmdbService.fetchAllMovies();
   }
 
   @override
@@ -42,36 +39,36 @@ class _CartoonsScreenState extends State<CartoonsScreen> {
           return Center(child: Text('Ошибка: ${snapshot.error}'));
         }
         final movies = snapshot.data ?? [];
-        if (movies.isEmpty) {
+        final cartoonMovies = movies.where((movie) => movie.category == 'Мультфильм').toList();
+        if (cartoonMovies.isEmpty) {
           return const Center(child: Text('Нет данных'));
         }
 
-        return Focus(
-          focusNode: widget.contentFocusNode,
-          child: GridView.builder(
-            padding: const EdgeInsets.all(24.0),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _crossAxisCount,
-              childAspectRatio: 0.65,
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-            ),
-            itemCount: movies.length,
-            itemBuilder: (context, index) {
-              return Focus(
-                onKey: (node, event) {
-                  if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    if (index % _crossAxisCount == 0) {
-                      widget.menuFocusNode.requestFocus();
-                      return KeyEventResult.handled;
-                    }
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: MovieCard(movie: movies[index]),
-              );
-            },
+        return GridView.builder(
+          padding: const EdgeInsets.all(24.0),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5, // Set a cross-axis count
+            childAspectRatio: 0.65,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
           ),
+          itemCount: cartoonMovies.length,
+          itemBuilder: (context, index) {
+            final movie = cartoonMovies[index];
+            return Focus(
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                  if (index % 5 == 0) {
+                    widget.menuFocusNode.requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                }
+                return KeyEventResult.ignored;
+              },
+              child: MovieCard(movie: movie, tmdbService: widget.tmdbService),
+            );
+          },
         );
       },
     );

@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:myapp/models/movie.dart';
+import 'package:myapp/services/tmdb_service.dart';
 import 'package:myapp/widgets/movie_card.dart';
 
 class MovieCarousel extends StatefulWidget {
   final String title;
   final List<Movie> movies;
-  // ДОБАВЛЕНО: Фокус-нода для возврата в меню
-  final FocusNode menuFocusNode; 
+  final FocusNode menuFocusNode;
+  final TMDbService tmdbService; // Added tmdbService
 
   const MovieCarousel({
     super.key,
     required this.title,
     required this.movies,
-    // ДОБАВЛЕНО: Требуем параметр в конструкторе
     required this.menuFocusNode,
+    required this.tmdbService, // Require tmdbService in constructor
   });
 
   @override
@@ -38,33 +39,29 @@ class _MovieCarouselState extends State<MovieCarousel> {
           ),
         ),
         SizedBox(
-          height: 270, // Высота карусели
+          height: 270, // Carousel height
           child: ListView.builder(
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
             itemCount: widget.movies.length,
             itemBuilder: (context, index) {
               final movie = widget.movies[index];
-              final isFocused = _focusedIndex == index;
 
-              // Оборачиваем каждую карточку в Focus, чтобы управлять навигацией
               return Focus(
                 onFocusChange: (hasFocus) {
                   setState(() {
                     if (hasFocus) {
                       _focusedIndex = index;
-                      // плавная прокрутка к элементу в фокусе
                       _scrollToIndex(index);
                     } else if (_focusedIndex == index) {
                       _focusedIndex = -1;
                     }
                   });
                 },
-                 onKey: (node, event) {
-                  // ИСПРАВЛЕНИЕ: Логика возврата фокуса в меню
-                  if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    if (index == 0) { // Если это первый элемент
-                      widget.menuFocusNode.requestFocus(); // Передаем фокус в меню
+                 onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    if (index == 0) { // If it's the first item
+                      widget.menuFocusNode.requestFocus(); // Return focus to the menu
                       return KeyEventResult.handled;
                     }
                   }
@@ -72,7 +69,8 @@ class _MovieCarouselState extends State<MovieCarousel> {
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: MovieCard(movie: movie, isFocused: isFocused),
+                  // Pass tmdbService to MovieCard
+                  child: MovieCard(movie: movie, tmdbService: widget.tmdbService),
                 ),
               );
             },
@@ -83,8 +81,7 @@ class _MovieCarouselState extends State<MovieCarousel> {
   }
 
   void _scrollToIndex(int index) {
-    // Простой расчет для прокрутки, можно улучшить
-    double target = index * 160.0; // Ширина карточки + отступ
+    double target = index * 160.0; // Card width + padding
     _scrollController.animateTo(
       target,
       duration: const Duration(milliseconds: 300),
