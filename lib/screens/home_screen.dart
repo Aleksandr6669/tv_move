@@ -1,121 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/models/movie.dart';
-import 'package:myapp/services/tmdb_service.dart';
-import 'package:myapp/widgets/movie_carousel.dart';
+import 'package:myapp/services/firebase_service.dart';
+import 'package:myapp/widgets/category_menu.dart';
+import 'package:myapp/widgets/movie_card.dart';
 
 class HomeScreen extends StatefulWidget {
-  final TMDbService tmdbService;
-  final FocusNode menuFocusNode;
-
-  const HomeScreen({
-    super.key,
-    required this.tmdbService,
-    required this.menuFocusNode,
-  });
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  late PageController _pageController;
-  late TabController _tabController;
+class _HomeScreenState extends State<HomeScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
+  String _selectedCategory = 'All';
 
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+  // Define the categories for the menu
+  final List<String> _categories = [
+    'All',
+    'Action',
+    'Comedy',
+    'Drama',
+    'Crime',
+    'Romance',
+    'Science Fiction',
+    'Thriller',
+  ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _tabController.dispose();
-    super.dispose();
+  void _onCategorySelected(String category) {
+    setState(() {
+      _selectedCategory = category;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Center(
-          child: TabPageSelector(
-            controller: _tabController,
-            selectedColor: Colors.green,
-            color: Colors.grey,
-          ),
-        ),
+        title: Text('Movie TV', style: GoogleFonts.lato(fontWeight: FontWeight.bold, fontSize: 28)),
       ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          _tabController.index = index;
-        },
+      body: Row(
         children: [
-          _buildCarouselPage(),
-          _buildRecommendationsPage(),
+          // Category Menu on the left
+          CategoryMenu(
+            categories: _categories,
+            onCategorySelected: _onCategorySelected,
+          ),
+
+          // Movie Grid on the right
+          Expanded(
+            child: StreamBuilder<List<Movie>>(
+              stream: _firebaseService.getMovies(category: _selectedCategory),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  // If there are no movies, show a button to add sample data
+                  return Center(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _firebaseService.addSampleMovies();
+                        // Show a snackbar on success
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Sample movies added successfully!')),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      ),
+                      child: const Text('Add Sample Movies', style: TextStyle(fontSize: 16)),
+                    ),
+                  );
+                } else {
+                  final movies = snapshot.data!;
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(20),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4, // More columns for TV
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                      childAspectRatio: 0.7, // Adjust aspect ratio for TV
+                    ),
+                    itemCount: movies.length,
+                    itemBuilder: (context, index) {
+                      final movie = movies[index];
+                      return MovieCard(movie: movie);
+                    },
+                  );
+                }
+              },
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCarouselPage() {
-    final Future<List<Movie>> moviesFuture = widget.tmdbService.fetchAllMovies();
-
-    return FutureBuilder<List<Movie>>(
-      future: moviesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Ошибка загрузки: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
-        }
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('Нет популярных фильмов', style: const TextStyle(color: Colors.white)));
-        }
-
-        final allMovies = snapshot.data!;
-        final categories = {
-          'Новинка': <Movie>[],
-          'Фильм': <Movie>[],
-          'Сериал': <Movie>[],
-          'Мультфильм': <Movie>[],
-          'Аниме': <Movie>[],
-        };
-
-        for (var movie in allMovies) {
-          if (categories.containsKey(movie.category)) {
-            categories[movie.category]!.add(movie);
-          }
-        }
-        
-        categories.removeWhere((key, value) => value.isEmpty);
-
-        return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          children: categories.entries.map((entry) {
-            return MovieCarousel(
-              title: entry.key,
-              movies: entry.value,
-              tmdbService: widget.tmdbService,
-              menuFocusNode: widget.menuFocusNode,
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildRecommendationsPage() {
-    return const Center(
-      child: Text(
-        'Рекомендации (скоро)',
-        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
       ),
     );
   }
