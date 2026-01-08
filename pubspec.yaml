@@ -16,6 +16,8 @@ dependencies:
   firebase_core: ^4.3.0
   cloud_firestore: ^6.1.1
   video_player: ^2.10.1
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
