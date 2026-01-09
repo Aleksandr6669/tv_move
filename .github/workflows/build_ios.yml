@@ -1,4 +1,5 @@
-name: Build Flutter iOS
+
+name: Build Flutter (iOS)
 
 on:
   workflow_dispatch:
@@ -6,22 +7,24 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.10.5' # Используйте нужную вам версию Flutter
 
-      - name: Get Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
       - name: Build IPA
-        run: flutter build ipa --release --no-codesign
+        run: flutter build ipa --release
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
         with:
           name: release-ipa
           path: build/ios/ipa/*.ipa
