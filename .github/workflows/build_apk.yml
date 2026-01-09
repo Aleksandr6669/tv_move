@@ -1,10 +1,7 @@
-
-name: Build Flutter
+name: Build Flutter (ANDROID)
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build:
