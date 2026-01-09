@@ -14,7 +14,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.10.5' # Используйте нужную вам версию Flutter
+          flutter-version: '3.22.2' # Обновленная версия Flutter
 
       - name: Install dependencies
         run: flutter pub get
@@ -27,3 +27,4 @@ jobs:
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
